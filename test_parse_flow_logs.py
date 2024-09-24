@@ -80,6 +80,74 @@ class TestFlowLogParser(unittest.TestCase):
         mock_file().write.assert_any_call("53,udp,1\n")
         mock_file().write.assert_any_call("8080,tcp,1\n")
 
+    @patch('builtins.open')
+    def test_load_protocols_file_not_found(self, mock_open):
+        mock_open.side_effect = FileNotFoundError
+        with self.assertRaises(FileNotFoundError):
+            load_protocols('nonexistent_protocols.csv')
+
+    @patch('builtins.open')
+    def test_create_lookup_table_file_not_found(self, mock_open):
+        mock_open.side_effect = FileNotFoundError
+        with self.assertRaises(FileNotFoundError):
+            create_lookup_table('nonexistent_lookup.csv')
+
+    @patch('builtins.open')
+    def test_parse_flow_logs_file_not_found(self, mock_open):
+        mock_open.side_effect = FileNotFoundError
+        with self.assertRaises(FileNotFoundError):
+            parse_flow_logs('nonexistent_flow_logs.txt')
+
+    @patch('builtins.open')
+    def test_parse_flow_logs_invalid_log_entry(self, mock_open):
+        mock_file_content = StringIO(
+            "2 1234 eni-0ab 192.168.1.1 10.0.0.1 12345\n"
+            "2 1234 eni-0ab 192.168.1.2 10.0.0.2 54321 443 6 1500 3000 1620140761 1620140821 ACCEPT OK\n"
+        )
+        mock_open.return_value.__enter__.return_value = mock_file_content
+
+        PROTOCOLS.update({6: 'tcp'})
+        LOOKUP.update({(443, 'tcp'): 'tag_1'})
+
+        with self.assertLogs(level='WARNING') as log:
+            tag_counts, port_protocol_counts = parse_flow_logs(
+                'dummy_flow_logs.txt')
+
+        self.assertEqual(tag_counts, {'tag_1': 1})
+        self.assertEqual(port_protocol_counts, {(443, 'tcp'): 1})
+        self.assertIn('Invalid log entry, less than 14 fields', log.output[0])
+
+    @patch('builtins.open')
+    def test_parse_flow_logs_invalid_values(self, mock_open):
+        mock_file_content = StringIO(
+            "2 1234 eni-0ab 192.168.1.2 10.0.0.2 54321 a b 1500 3000 1620140761 1620140821 ACCEPT OK\n"
+            "2 1234 eni-0ab 192.168.1.2 10.0.0.2 54321 443 6 1500 3000 1620140761 1620140821 ACCEPT OK\n"
+        )
+        mock_open.return_value.__enter__.return_value = mock_file_content
+
+        PROTOCOLS.update({6: 'tcp'})
+        LOOKUP.update({(443, 'tcp'): 'tag_1'})
+
+        with self.assertLogs(level='WARNING') as log:
+            tag_counts, port_protocol_counts = parse_flow_logs(
+                'dummy_flow_logs.txt')
+
+        self.assertEqual(tag_counts, {'tag_1': 1})
+        self.assertEqual(port_protocol_counts, {(443, 'tcp'): 1})
+        self.assertIn('Invalid port or protocol', log.output[0])
+
+    @patch('builtins.open')
+    def test_write_output_exception(self, mock_open):
+        mock_file = Mock()
+        mock_file.write.side_effect = IOError("Unable to write to file")
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        tag_counts = {'tag_1': 2}
+        port_protocol_counts = {(80, 'tcp'): 1}
+
+        with self.assertRaises(IOError):
+            write_output(tag_counts, port_protocol_counts)
+
 
 if __name__ == '__main__':
     unittest.main()

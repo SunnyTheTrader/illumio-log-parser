@@ -1,21 +1,43 @@
 import csv
-from collections import defaultdict
-
 import logging
+
+from collections import defaultdict
+from typing import Dict, Tuple
+
+
+"""
+LOOKUP = {
+    (dstport, protocol): tag
+}
+"""
+LOOKUP: Dict[Tuple[int, str], str] = {}
+
+"""
+PROTOCOLS = {
+    protocol_number: protocol_name
+}
+"""
+PROTOCOLS: Dict[int, str] = {}
+
+# Input Files
+FLOW_LOG_FILE = 'flowlogs.txt'
+LOOKUP_FILE = 'lookup.csv'
+
+TAG_COUNTS_OUTPUT_FILE = 'tc_output.txt'
+PORT_PROTOCOL_COUNTS_OUTPUT_FILE = 'ppc_output.txt'
+
+PROTOCOLS_FILE = 'protocols.csv'
+MIN_FIELDS_IN_LOG = 14
+
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
 
 
-LOOKUP = {}
-PROTOCOLS = {}
-
-
-def load_protocols(protocols_file):
+def load_protocols(protocols_file: str) -> None:
     """
-    Read protocols file and populate the dictionary.
+    Read protocols file and populate the PROTOCOLS dictionary.
 
-    PROTOCOLS = {
-        protocol_number: protocol_name
-    }
+    Args:
+        protocols_file (str): Path to the protocols file
     """
     logging.info(f"Loading protocols from {protocols_file}")
     with open(protocols_file, 'r') as f:
@@ -24,14 +46,12 @@ def load_protocols(protocols_file):
             PROTOCOLS[int(row['number'])] = row['name']
 
 
-def create_lookup_table(lookup_file):
+def create_lookup_table(lookup_file: str) -> None:
     """
-    Read lookup table and populate the lookup dictionary. The key is a tuple of
-    (dstport, protocol), and the value is the tag.
+    Read lookup table and populate the LOOKUP dictionary.
 
-    LOOKUP = {
-        (dstport, protocol): tag
-    }
+    Args:
+    lookup_file (str): Path to the lookup file.
     """
     logging.info(f"Creating lookup table from {lookup_file}")
     with open(lookup_file, 'r') as f:
@@ -41,58 +61,93 @@ def create_lookup_table(lookup_file):
             LOOKUP[key] = row['tag']
 
 
-def parse_flow_logs(flow_log_file):
+def parse_flow_logs(flow_log_file: str) -> Tuple[Dict[str, int], Dict[Tuple[int, str], int]]:
     """
-    Parse flow logs and update the tag_counts and port_protocol_counts
-    dictionaries.
+    Parse flow logs and return the tag counts and port-protocol counts.
+
+    Args:
+        flow_log_file (str): Path to the flow log file.
+
+    Returns:
+        Tuple[Dict[str, int], Dict[Tuple[int, str], int]]: A tuple containing
+        tag counts and port-protocol counts.
     """
+    # Initialize counters
+    tag_counts = defaultdict(int)
+    port_protocol_counts = defaultdict(int)
+
     logging.info(f"Parsing flow logs from {flow_log_file}")
-    with open(flow_log_file, 'r') as f:
-        for line_number, line in enumerate(f, start=1):
-            fields = line.strip().split()
-            if len(fields) < 14:
-                logging.warning(
-                    f"\nInvalid line: less than 14 fields at line {line_number}, skipping it \n{line}")
-                continue
+    try:
+        with open(flow_log_file, 'r') as f:
+            for line_number, log_entry in enumerate(f, start=1):
+                fields = log_entry.strip().split()
+                if len(fields) < MIN_FIELDS_IN_LOG:
+                    logging.warning(
+                        f"\nInvalid log entry, less than {MIN_FIELDS_IN_LOG} fields at line {line_number}, skipping")
+                    continue
 
-            dstport = int(fields[6])
-            protocol = PROTOCOLS.get(int(fields[7]), 'unknown')
+                try:
+                    dstport = int(fields[6])
+                    protocol = PROTOCOLS.get(int(fields[7]), 'unknown')
+                except ValueError:
+                    logging.warning(
+                        f"Invalid port or protocol at line {line_number}, skipping")
+                    continue
 
-            key = (dstport, protocol)
-            tag = LOOKUP.get(key, 'untagged')
+                key = (dstport, protocol)
+                tag = LOOKUP.get(key, 'untagged')
 
-            tag_counts[tag] += 1
-            port_protocol_counts[key] += 1
+                tag_counts[tag] += 1
+                port_protocol_counts[key] += 1
+
+    except FileNotFoundError:
+        logging.error(f"Flow log file not found: {flow_log_file}")
+        raise
+
+    return tag_counts, port_protocol_counts
 
 
-# Setup
-flow_log_file = 'flowlogs.txt'
-lookup_file = 'lookup.csv'
+def write_output(tag_counts: Dict[str, int], port_protocol_counts: Dict[Tuple[int, str], int]) -> None:
+    """
+    Write the tag counts and port-protocol counts to output files.
 
-protocols_file = 'protocols.csv'
+    Args:
+        tag_counts (Dict[str, int]): Dictionary of tag counts.
+        port_protocol_counts (Dict[Tuple[int, str], int]): Dictionary of port-protocol counts.
+    """
+    logging.info(
+        f"Writing output to the files, {TAG_COUNTS_OUTPUT_FILE} and {PORT_PROTOCOL_COUNTS_OUTPUT_FILE}")
 
-create_lookup_table(lookup_file)
-load_protocols(protocols_file)
+    try:
+        with open(TAG_COUNTS_OUTPUT_FILE, 'w') as f:
+            f.write("Tag,Count\n")
+            for tag, count in tag_counts.items():
+                f.write(f"{tag},{count}\n")
 
-tag_counts_output_file = 'tc_output.txt'
-port_protocol_counts_output_file = 'ppc_output.txt'
+        with open(PORT_PROTOCOL_COUNTS_OUTPUT_FILE, 'w') as f:
+            f.write("Port,Protocol,Count\n")
+            for (port, protocol), count in port_protocol_counts.items():
+                f.write(f"{port},{protocol},{count}\n")
 
-# Initialize counters
-tag_counts = defaultdict(int)
-port_protocol_counts = defaultdict(int)
+    except Exception as e:
+        logging.error(f"Error writing tag counts to the file: {e}")
+        raise
 
-# Parse flow logs
-parse_flow_logs(flow_log_file)
 
-# Write output
-logging.info(
-    f"Writing output to the files, {tag_counts_output_file} and {port_protocol_counts_output_file}")
-with open(tag_counts_output_file, 'w') as f:
-    f.write("Tag,Count\n")
-    for tag, count in tag_counts.items():
-        f.write(f"{tag},{count}\n")
+def main():
+    """
+    Main function to orchestrate the flow log parsing process.
+    """
+    try:
+        create_lookup_table(LOOKUP_FILE)
+        load_protocols(PROTOCOLS_FILE)
+        tag_counts, port_protocol_counts = parse_flow_logs(FLOW_LOG_FILE)
+        write_output(tag_counts, port_protocol_counts)
 
-with open(port_protocol_counts_output_file, 'w') as f:
-    f.write("Port,Protocol,Count\n")
-    for (port, protocol), count in port_protocol_counts.items():
-        f.write(f"{port},{protocol},{count}\n")
+    except Exception as e:
+        logging.error(f"An error occurred during execution: {e}")
+        raise
+
+
+if __name__ == '__main__':
+    main()

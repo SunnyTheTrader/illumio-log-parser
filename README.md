@@ -14,9 +14,9 @@ and `protocol` combination decide what `tag` can be applied.
 1. The flow log file will have at least 14 fields in each line. If a line has
    less than 14 fields, it will be skipped.
 2. The protocols are populated from the [protocols file](/protocols.csv). It has
-   the popular protocols listed in the format of `protocol number,protocol
-name`. If a protocol is not found in this CSV file, it will be counted as
-   `unknown`.
+   the popular protocols listed in the format of
+   `protocol_number,protocol_name`. If a protocol is not found in this CSV file,
+   it will be counted as `unknown`.
 
 ## Usage
 
@@ -26,7 +26,8 @@ python3 parse_flow_logs.py
 
 The program will read the flow logs from `flowlogs.txt` and the lookup table
 from `lookup.csv`. It will write the output to `tc_output.txt` and
-`ppc_output.txt`.
+`ppc_output.txt`. Alternatively, you can specify the filenames in the
+[configuration file `config.ini`](./config.ini).
 
 ## Testing
 

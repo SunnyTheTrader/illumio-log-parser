@@ -1,32 +1,37 @@
 import csv
 import logging
+import configparser
 
 from collections import defaultdict
 from typing import Dict, Tuple
 
 
 """
+LOOKUP and PROTOCOLS are global dictionaries that will be populated from the lookup and protocols files.
+
 LOOKUP = {
     (dstport, protocol): tag
 }
-"""
-LOOKUP: Dict[Tuple[int, str], str] = {}
-
-"""
 PROTOCOLS = {
     protocol_number: protocol_name
 }
 """
+
+LOOKUP: Dict[Tuple[int, str], str] = {}
 PROTOCOLS: Dict[int, str] = {}
 
-# Input Files
-FLOW_LOG_FILE = 'flowlogs.txt'
-LOOKUP_FILE = 'lookup.csv'
+# Load configuration
+config = configparser.ConfigParser()
+config.read('config.ini')
+files = config['files']
 
-TAG_COUNTS_OUTPUT_FILE = 'tc_output.txt'
-PORT_PROTOCOL_COUNTS_OUTPUT_FILE = 'ppc_output.txt'
+FLOW_LOG_FILE = files['flow_log_file'] if 'flow_log_file' in files else 'flowlogs.txt'
+LOOKUP_FILE = files['lookup_file'] if 'lookup_file' in files else 'lookup.csv'
 
-PROTOCOLS_FILE = 'protocols.csv'
+TAG_COUNTS_OUTPUT_FILE = files['tag_counts_output_file'] if 'tag_counts_output_file' in files else 'tag_counts.csv'
+PORT_PROTOCOL_COUNTS_OUTPUT_FILE = files['port_protocol_counts_output_file'] if 'port_protocol_counts_output_file' in files else 'port_protocol_counts.csv'
+
+PROTOCOLS_FILE = files['protocols_file'] if 'protocols_file' in files else 'protocols.csv'
 MIN_FIELDS_IN_LOG = 14
 
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')

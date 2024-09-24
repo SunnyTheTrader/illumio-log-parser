@@ -43,7 +43,7 @@ def load_protocols(protocols_file: str) -> None:
     with open(protocols_file, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            PROTOCOLS[int(row['number'])] = row['name']
+            PROTOCOLS[int(row['number'])] = row['name'].lower()
 
 
 def create_lookup_table(lookup_file: str) -> None:

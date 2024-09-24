@@ -15,7 +15,7 @@ and `protocol` combination decide what `tag` can be applied.
    less than 14 fields, it will be skipped.
 2. The protocols are populated from the [protocols file](/protocols.csv). It has
    the popular protocols listed in the format of `protocol number,protocol
-   name`. If a protocol is not found in this CSV file, it will be counted as
+name`. If a protocol is not found in this CSV file, it will be counted as
    `unknown`.
 
 ## Usage
@@ -27,6 +27,12 @@ python3 parse_flow_logs.py
 The program will read the flow logs from `flowlogs.txt` and the lookup table
 from `lookup.csv`. It will write the output to `tc_output.txt` and
 `ppc_output.txt`.
+
+## Testing
+
+```bash
+python3 -m unittest test_parse_flow_logs.py
+```
 
 ## Requirements
 

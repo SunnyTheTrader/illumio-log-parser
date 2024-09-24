@@ -5,14 +5,13 @@ Illumio Technical Assessment 2024
 ## Problem
 
 Write a program that can parse a file containing [flow log data](./flowlogs.txt)
-and maps each row to a tag based on a lookup table. The [lookup
-table](./lookup.csv) has 3 columns, `dstport`, `protocol`, `tag`. The `dstport`
-and `protocol` combination decide what `tag` can be applied.
+and maps each row to a tag based on a [lookup table](./lookup.csv).
 
 ## Assumptions
 
-1. The flow log file will have at least 14 fields in each line. If a line has
-   less than 14 fields, it will be skipped.
+1. The program only supports default log format (v2) (i.e, flow log file will
+   have at least 14 fields in each line). If a line has less than 14 fields, it
+   will be skipped.
 2. The protocols are populated from the [protocols file](/protocols.csv). It has
    the popular protocols listed in the format of
    `protocol_number,protocol_name`. If a protocol is not found in this CSV file,
@@ -30,6 +29,8 @@ from `lookup.csv`. It will write the output to `tc_output.txt` and
 [configuration file `config.ini`](./config.ini).
 
 ## Testing
+
+You can run the unit tests for the program
 
 ```bash
 python3 -m unittest test_parse_flow_logs.py
@@ -108,7 +109,8 @@ https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html#flow-logs
 
 ### `lookup.csv`
 
-The lookup table is used to map the destination port and protocol to a tag.
+The lookup table is used to map the destination port and protocol to a tag. The
+`dstport` and `protocol` combination decide what `tag` can be applied.
 
 ```csv
 dstport,protocol,tag
@@ -120,3 +122,29 @@ The fields in the lookup table are as follows:
 1. Destination Port (`dstport`) [integer]
 2. Protocol (`protocol`) [tcp/udp/icmp]
 3. Tag (`tag`) [string]
+
+## Stress Testing
+
+I created a [python
+script](https://gist.github.com/vchrombie/91885dede7c21b3dee6fa8421f130db0)
+which generates random flow logs and lookup tables to test the performance of
+the program. The script generates flow logs over filesize of 10 MB and lookup
+table with mroe than 10,00 entries. The flow logs are written to `flowlogs.txt`
+and the lookup table is written to `lookup.csv`.
+
+```bash
+$ python generate_flow_log_data.py
+
+$ wc -l lookup.csv
+   10001 lookup.csv
+
+$ du -sh flowlogs.txt
+ 10M    flowlogs.txt
+
+$ time python parse_flow_logs.py
+INFO - Creating lookup table from lookup.csv
+INFO - Loading protocols from protocols.csv
+INFO - Parsing flow logs from flowlogs.txt
+INFO - Writing output to the files, tc_output.txt and ppc_output.txt
+python3 parse_flow_logs.py  0.24s user 0.02s system 92% cpu 0.276 total
+```
